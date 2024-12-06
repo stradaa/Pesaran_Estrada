@@ -1,0 +1,117 @@
+function plotSpec_comparisons(original_data, preprocessed_data, fs, freq_range, zoom_freq_range, window_length, overlap, title_text)
+    % Parameters
+    % original_data, preprocessed_data: ch x t matrices
+    % fs: Sampling rate in Hz
+    % freq_range: Frequency range for analysis [min, max]
+    % zoom_freq_range: Frequency range for zoomed-in spectrum [min, max]
+    % window_length: Window length for spectrogram in seconds
+    % overlap: Overlap fraction for spectrogram (e.g., 0.5 for 50% overlap)
+    % title_text: Title for the overall figure
+
+    % Define the number of channels and time frames
+    [ch, t] = size(original_data);
+
+    % Time vector for plotting
+    time = (0:t-1) / fs;
+
+    % Frequency vector for spectrogram
+    frequencies = freq_range(1):1:freq_range(2);
+
+    % Function to compute power spectrogram
+    compute_mean_spectrogram = @(data) mean(cell2mat(arrayfun(@(ch) ...
+        abs(spectrogram(data(ch, :), ...
+        round(window_length*fs), ...
+        round(overlap*window_length*fs), ...
+        frequencies, fs, 'yaxis')).^2, ...
+        1:ch, 'UniformOutput', false)), 3);
+
+    % Function to compute power spectrum
+    compute_power_spectrum = @(data) ...
+        deal(mean(abs(fft(data, [], 2)).^2, 1), ...
+             std(abs(fft(data, [], 2)).^2, 0, 1) / sqrt(ch));
+
+    % Compute mean power spectrograms
+    mean_spectrogram_orig = compute_mean_spectrogram(original_data);
+    mean_spectrogram_prep = compute_mean_spectrogram(preprocessed_data);
+
+    % Compute power spectra
+    [mean_spectrum_orig, std_spectrum_orig] = compute_power_spectrum(original_data);
+    [mean_spectrum_prep, std_spectrum_prep] = compute_power_spectrum(preprocessed_data);
+
+    % Frequency vector for power spectrum
+    freq_vector = linspace(0, fs/2, size(original_data, 2)/2);
+
+    % Initialize tiled layout
+    figure;
+    tiledlayout(3, 2);
+
+    % Plot original power spectrogram
+    nexttile;
+    imagesc(time, frequencies, 10*log10(mean_spectrogram_orig)); % Convert to dB
+    axis xy; % Flip the y-axis to show low frequencies at the bottom
+    xlabel('Time (s)');
+    ylabel('Frequency (Hz)');
+    title('Original Power Spectrogram');
+    colorbar;
+
+    % Plot preprocessed power spectrogram
+    nexttile;
+    imagesc(time, frequencies, 10*log10(mean_spectrogram_prep)); % Convert to dB
+    axis xy;
+    xlabel('Time (s)');
+    ylabel('Frequency (Hz)');
+    title('Preprocessed Power Spectrogram');
+    colorbar;
+
+    % Plot original power spectrum
+    nexttile;
+    hold on;
+    fill([freq_vector, fliplr(freq_vector)], ...
+        [mean_spectrum_orig(1:length(freq_vector)) - std_spectrum_orig(1:length(freq_vector)), ...
+         fliplr(mean_spectrum_orig(1:length(freq_vector)) + std_spectrum_orig(1:length(freq_vector)))], ...
+         'b', 'FaceAlpha', 0.3, 'EdgeColor', 'none'); % Shaded confidence intervals
+    plot(freq_vector, mean_spectrum_orig(1:length(freq_vector)), 'b', 'LineWidth', 1.5); % Mean line
+    xlabel('Frequency (Hz)');
+    ylabel('Power');
+    title('Original Power Spectrum');
+    xlim(freq_range);
+    hold off;
+
+    % Plot preprocessed power spectrum
+    nexttile;
+    hold on;
+    fill([freq_vector, fliplr(freq_vector)], ...
+        [mean_spectrum_prep(1:length(freq_vector)) - std_spectrum_prep(1:length(freq_vector)), ...
+         fliplr(mean_spectrum_prep(1:length(freq_vector)) + std_spectrum_prep(1:length(freq_vector)))], ...
+         'r', 'FaceAlpha', 0.3, 'EdgeColor', 'none'); % Shaded confidence intervals
+    plot(freq_vector, mean_spectrum_prep(1:length(freq_vector)), 'r', 'LineWidth', 1.5); % Mean line
+    xlabel('Frequency (Hz)');
+    ylabel('Power');
+    title('Preprocessed Power Spectrum');
+    xlim(freq_range);
+    hold off;
+
+    % Plot zoomed-in power spectrum
+    nexttile([1 2]); % Single wide tile for better visualization
+    hold on;
+    fill([freq_vector, fliplr(freq_vector)], ...
+        [mean_spectrum_orig(1:length(freq_vector)) - std_spectrum_orig(1:length(freq_vector)), ...
+         fliplr(mean_spectrum_orig(1:length(freq_vector)) + std_spectrum_orig(1:length(freq_vector)))], ...
+         'b', 'FaceAlpha', 0.3, 'EdgeColor', 'none'); % Original shaded confidence intervals
+    plot(freq_vector, mean_spectrum_orig(1:length(freq_vector)), 'b', 'LineWidth', 1.5); % Original mean line
+    fill([freq_vector, fliplr(freq_vector)], ...
+        [mean_spectrum_prep(1:length(freq_vector)) - std_spectrum_prep(1:length(freq_vector)), ...
+         fliplr(mean_spectrum_prep(1:length(freq_vector)) + std_spectrum_prep(1:length(freq_vector)))], ...
+         'r', 'FaceAlpha', 0.3, 'EdgeColor', 'none'); % Preprocessed shaded confidence intervals
+    plot(freq_vector, mean_spectrum_prep(1:length(freq_vector)), 'r', 'LineWidth', 1.5); % Preprocessed mean line
+    xlabel('Frequency (Hz)');
+    ylabel('Power');
+    title('Zoomed-In Power Spectrum (0–105 Hz)');
+    xlim(zoom_freq_range);
+    set(gca, 'XScale', 'log'); % Optional: Log scale
+    legend({'Original CI', 'Original Mean', 'Preprocessed CI', 'Preprocessed Mean'}, 'Location', 'Best');
+    hold off;
+
+    % Final formatting
+    sgtitle(title_text);
+end
