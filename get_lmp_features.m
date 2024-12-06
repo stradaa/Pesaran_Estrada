@@ -9,7 +9,6 @@ arguments
     to_plot
 end
 
-
 % baseline
 base_permuted = permute(Data_Base, [2, 3, 1]); % channels x time x trials
 base_reshaped = reshape(base_permuted, 244, []); % channels x (time * trials)
